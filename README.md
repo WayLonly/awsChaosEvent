@@ -1,4 +1,4 @@
--- Tree Auto Farm com Fluent (PalmTree especial + outros com Destroyed/timeout + opção "Todos" cíclica com espera)
+-- Tree Auto Farm com Fluent (multiselect via toggles)
 
 -------------------------------------------------
 -- LOAD FLUENT
@@ -89,77 +89,40 @@ end
 local function autoTPSelectedTrees()
     task.spawn(function()
         while Options.AutoTreeTP.Value do
-            local selectedType = Options.TargetTree.Value
+            -- monta lista de tipos selecionados pelos toggles
+            local selectedTypes = {}
+            if Options.ToxicTree.Value then table.insert(selectedTypes, "ToxicTree") end
+            if Options.InfectedTree.Value then table.insert(selectedTypes, "InfectedTree") end
+            if Options.PalmTree.Value then table.insert(selectedTypes, "PalmTree") end
+            if Options.ChaosTree.Value then table.insert(selectedTypes, "ChaosTree") end
 
-            if selectedType == "PalmTree" then
-                -- ciclo especial para PalmTree
-                local index = 1
-                while Options.AutoTreeTP.Value and Options.TargetTree.Value == "PalmTree" do
-                    local trees = {}
-                    for _, tree in ipairs(workspace.GameObjects.ChaosBreakables.Axe:GetChildren()) do
-                        if tree.Name == "PalmTree" then
-                            table.insert(trees, tree)
-                        end
-                    end
-                    if #trees > 0 then
-                        if index > #trees then
-                            index = 1
-                        end
-                        teleportToTree(trees[index])
-                        index = index + 1
-                    end
-                    task.wait(0.3)
-                end
-
-            elseif selectedType == "Todos" then
-                -- ciclo por todas as árvores ativas, esperando cada uma ser destruída
-                local index = 1
-                while Options.AutoTreeTP.Value and Options.TargetTree.Value == "Todos" do
-                    local trees = {}
-                    for _, tree in ipairs(workspace.GameObjects.ChaosBreakables.Axe:GetChildren()) do
-                        if tree:GetAttribute("Destroyed") ~= true then
-                            table.insert(trees, tree)
-                        end
-                    end
-                    if #trees > 0 then
-                        if index > #trees then
-                            index = 1
-                        end
-                        local currentTree = trees[index]
-                        teleportToTree(currentTree)
-
-                        -- espera até ser destruída ou timeout de 10s
-                        local startTime = tick()
-                        repeat
-                            task.wait(0.5)
-                        until currentTree:GetAttribute("Destroyed") == true 
-                            or tick() - startTime >= 10 
-                            or not Options.AutoTreeTP.Value 
-                            or Options.TargetTree.Value ~= "Todos"
-
-                        index = index + 1
-                    else
-                        task.wait(1)
+            local index = 1
+            while Options.AutoTreeTP.Value do
+                local trees = {}
+                for _, tree in ipairs(workspace.GameObjects.ChaosBreakables.Axe:GetChildren()) do
+                    if table.find(selectedTypes, tree.Name) and tree:GetAttribute("Destroyed") ~= true then
+                        table.insert(trees, tree)
                     end
                 end
 
-            else
-                -- comportamento para Toxic, Infected, Chaos
-                local currentTree = nil
-                while Options.AutoTreeTP.Value and Options.TargetTree.Value == selectedType do
-                    if not currentTree or currentTree:GetAttribute("Destroyed") == true then
-                        local trees = {}
-                        for _, tree in ipairs(workspace.GameObjects.ChaosBreakables.Axe:GetChildren()) do
-                            if tree.Name == selectedType and tree:GetAttribute("Destroyed") ~= true then
-                                table.insert(trees, tree)
-                            end
-                        end
-                        if #trees > 0 then
-                            currentTree = trees[1]
-                            teleportToTree(currentTree)
-                        end
+                if #trees > 0 then
+                    if index > #trees then
+                        index = 1
                     end
-                    task.wait(0.5)
+                    local currentTree = trees[index]
+                    teleportToTree(currentTree)
+
+                    -- espera até ser destruída ou timeout de 10s
+                    local startTime = tick()
+                    repeat
+                        task.wait(0.5)
+                    until currentTree:GetAttribute("Destroyed") == true 
+                        or tick() - startTime >= 10 
+                        or not Options.AutoTreeTP.Value
+
+                    index = index + 1
+                else
+                    task.wait(1)
                 end
             end
         end
@@ -169,13 +132,16 @@ end
 local function autoAttackSelectedTrees()
     task.spawn(function()
         while Options.AutoAttack.Value do
-            local selectedType = Options.TargetTree.Value
+            local selectedTypes = {}
+            if Options.ToxicTree.Value then table.insert(selectedTypes, "ToxicTree") end
+            if Options.InfectedTree.Value then table.insert(selectedTypes, "InfectedTree") end
+            if Options.PalmTree.Value then table.insert(selectedTypes, "PalmTree") end
+            if Options.ChaosTree.Value then table.insert(selectedTypes, "ChaosTree") end
+
             local trees = {}
             for _, tree in ipairs(workspace.GameObjects.ChaosBreakables.Axe:GetChildren()) do
-                if selectedType == "Todos" or tree.Name == selectedType then
-                    if tree:GetAttribute("Destroyed") ~= true then
-                        table.insert(trees, tree)
-                    end
+                if table.find(selectedTypes, tree.Name) and tree:GetAttribute("Destroyed") ~= true then
+                    table.insert(trees, tree)
                 end
             end
             if #trees > 0 then
@@ -212,11 +178,11 @@ Options.AutoAttack:OnChanged(function(state)
     end
 end)
 
-Tabs.Main:AddDropdown("TargetTree", {
-    Title = "Selecionar Tipo de Árvore",
-    Values = {"ToxicTree", "InfectedTree", "PalmTree", "ChaosTree", "Todos"},
-    Default = "ToxicTree"
-})
+-- Multiselect via toggles
+Tabs.Main:AddToggle("ToxicTree", { Title = "Farm ToxicTree", Default = false })
+Tabs.Main:AddToggle("InfectedTree", { Title = "Farm InfectedTree", Default = false })
+Tabs.Main:AddToggle("PalmTree", { Title = "Farm PalmTree", Default = false })
+Tabs.Main:AddToggle("ChaosTree", { Title = "Farm ChaosTree", Default = false })
 
 -------------------------------------------------
 -- START
@@ -225,6 +191,6 @@ Tabs.Main:AddDropdown("TargetTree", {
 Window:SelectTab(1)
 Fluent:Notify({
     Title = "Hub Loaded",
-    Content = "Tree Auto Farm Ready (PalmTree ciclo 0.3s, outros com Destroyed/timeout, Todos espera destruir cada árvore)",
+    Content = "Tree Auto Farm Ready (Multiselect via toggles, ciclo com espera de destruição)",
     Duration = 5
 })
